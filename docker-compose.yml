@@ -1,0 +1,11 @@
+version: '3.8'
+
+services:
+  autorole-bot:
+    build: .
+    container_name: bloumechat-autorole-bot
+    restart: always
+    env_file:
+      - .env
+    volumes:
+      - ./data:/usr/src/app/data
