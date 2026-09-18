@@ -1,14 +1,22 @@
-FROM node:20-alpine
+FROM node:20-slim
 
-WORKDIR /usr/src/app
+# Configuration de l'environnement de production
+ENV NODE_ENV=production
 
+# Dossier de travail dans le conteneur
+WORKDIR /app
+
+# Copie des fichiers de dépendances
 COPY package*.json ./
 
-RUN npm install --production
+# Installation des dépendances de production uniquement
+RUN npm install --omit=dev
 
-COPY . .
+# Copie des fichiers sources de l'application
+COPY src/ ./src/
 
-# Ensure data directory exists
-RUN mkdir -p data
+# Création du dossier de persistance
+RUN mkdir -p /app/data
 
+# Commande de démarrage du bot
 CMD ["node", "src/index.js"]
