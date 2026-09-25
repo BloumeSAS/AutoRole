@@ -36,7 +36,7 @@ async function hasAdminAccess(client, message) {
 
   // 2. Check Guild Owner
   if (guild) {
-    const ownerId = guild.ownerId || (guild.rawData && (guild.rawData.ownerId || guild.rawData.ownerPublicId || guild.rawData.owner_id));
+    const ownerId = guild.ownerId || (guild.rawData && (guild.rawData.ownerId || guild.rawData.ownerPublicId || guild.rawData.owner_id || guild.rawData.owner?.publicId));
     if (ownerId && ownerId === message.author.id) {
       return true;
     }
@@ -56,20 +56,42 @@ async function hasAdminAccess(client, message) {
       return true;
     }
 
-    // Administrator or MANAGE_ROLES or MANAGE_SERVER permission check
+    // Direct SDK check
     if (typeof member.hasPermission === 'function') {
-      if (member.hasPermission(PermissionFlags.ADMINISTRATOR) || member.hasPermission(PermissionFlags.MANAGE_SERVER) || member.hasPermission(PermissionFlags.MANAGE_ROLES)) {
+      if (member.hasPermission(PermissionFlags.ADMINISTRATOR) || 
+          member.hasPermission(PermissionFlags.MANAGE_SERVER) || 
+          member.hasPermission(PermissionFlags.MANAGE_ROLES)) {
         return true;
       }
     }
 
-    const settings = getSettings(message.serverId);
+    // Comprehensive Fallback Permission Checking
+    const requiredPermissions = [
+      PermissionFlags.ADMINISTRATOR,
+      PermissionFlags.MANAGE_SERVER,
+      PermissionFlags.MANAGE_ROLES
+    ];
 
-    // Check configured Permission
+    const settings = getSettings(message.serverId);
     if (settings.adminPermission && settings.adminPermission !== 'none') {
-      const requiredFlag = permissionMap[settings.adminPermission.toUpperCase()];
-      if (requiredFlag && typeof member.hasPermission === 'function' && member.hasPermission(requiredFlag)) {
-        return true;
+      const customFlag = permissionMap[settings.adminPermission.toUpperCase()];
+      if (customFlag) {
+        requiredPermissions.push(customFlag);
+      }
+    }
+
+    if (member.roles && Array.isArray(member.roles)) {
+      for (const roleItem of member.roles) {
+        let roleObj = roleItem;
+        if (typeof roleItem === 'string' && guild && guild.roles && guild.roles.cache) {
+          roleObj = guild.roles.cache.get(roleItem);
+        }
+        if (roleObj && typeof roleObj === 'object') {
+          const permVal = BigInt(roleObj.permissions || 0);
+          for (const flag of requiredPermissions) {
+            if ((permVal & flag) === flag) return true;
+          }
+        }
       }
     }
   }

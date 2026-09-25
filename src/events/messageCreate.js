@@ -26,29 +26,14 @@ module.exports = async (client, message) => {
 
   if (!command) return;
 
-  console.log(`[Command Execution] ${prefix}${commandName} par ${message.author.username || 'Inconnu'}`);
+  console.log(`[Command Execution] ${prefix}${commandName} par ${message.author.username || 'Inconnu'} (Serveur: ${message.serverId || 'DM'})`);
 
-  // Base permission check for the bot in the channel
-  if (message.serverId) {
+  // Ensure guild is cached if serverId exists
+  if (message.serverId && !client.guilds.cache.has(message.serverId)) {
     try {
-      const botMember = await client.members.fetch(message.serverId, client.user.id);
-      const { PermissionFlags } = require('bloumechat');
-      if (botMember) {
-        const canView = botMember.hasPermission(PermissionFlags.VIEW_CHANNELS);
-        const canSend = botMember.hasPermission(PermissionFlags.SEND_MESSAGES);
-        if (!canView || !canSend) {
-          console.warn(`[MessageCreate] Le bot manque de permissions sur le serveur ${message.serverId}`);
-          try {
-            const dm = await client.createDM(message.author.id);
-            await dm.send(`⚠️ **Alerte Permission** : Je ne peux pas exécuter la commande \`${prefix}${commandName}\` car je n'ai pas les permissions de lire ce salon ou d'y envoyer des messages.`);
-          } catch (dmErr) {
-            console.error("[MessageCreate] Impossible d'envoyer l'alerte de permission en DM :", dmErr.message);
-          }
-          return;
-        }
-      }
+      await client.guilds.fetch(message.serverId);
     } catch (err) {
-      console.warn(`[MessageCreate] Vérification permissions bot échouée :`, err.message);
+      console.warn(`[MessageCreate] Erreur fetch guilde ${message.serverId} :`, err.message);
     }
   }
 
