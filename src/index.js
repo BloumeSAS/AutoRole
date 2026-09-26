@@ -15,7 +15,15 @@ client.commands = new Map();
 
 // Load Commands dynamically
 const commandsPath = path.join(__dirname, 'commands');
-if (fs.existsSync(commandsPath)) {
+if (typeof client.loadCommands === 'function') {
+  client.loadCommands(commandsPath).then((cmds) => {
+    for (const [name] of cmds) {
+      console.log(`[Command Loader] Commande chargée : !${name}`);
+    }
+  }).catch((err) => {
+    console.error("[Command Loader] Impossible de charger les commandes :", err);
+  });
+} else if (fs.existsSync(commandsPath)) {
   const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
   for (const file of commandFiles) {
     try {

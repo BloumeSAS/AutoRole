@@ -133,9 +133,13 @@ async function handleReactionRole(client, rawData) {
           if (added) {
             console.log(`[AutoRoleManager] ✅ Réaction ajoutée : Rôle ${mapping.roleName} (${roleId}) attribué à ${member.user ? member.user.tagString : userId}`);
             try {
-              const dm = await client.createDM(userId);
               const embed = createEmbed("🎭 Rôle Attribué", `Le rôle **${mapping.roleName}** vous a été attribué suite à votre réaction sur le serveur !`, targetServerId);
-              await dm.send({ embeds: [embed] });
+              if (typeof member.send === 'function') {
+                await member.send({ embeds: [embed] });
+              } else {
+                const dm = await client.createDM(userId);
+                await dm.send({ embeds: [embed] });
+              }
             } catch (dmErr) {}
           }
         }
@@ -175,9 +179,13 @@ async function handleReactionRole(client, rawData) {
           if (removed) {
             console.log(`[AutoRoleManager] ❌ Réaction retirée : Rôle ${mapping.roleName} (${roleId}) retiré à ${member.user ? member.user.tagString : userId}`);
             try {
-              const dm = await client.createDM(userId);
               const embed = createEmbed("🎭 Rôle Retiré", `Le rôle **${mapping.roleName}** vous a été retiré suite au retrait de votre réaction sur le serveur.`, targetServerId);
-              await dm.send({ embeds: [embed] });
+              if (typeof member.send === 'function') {
+                await member.send({ embeds: [embed] });
+              } else {
+                const dm = await client.createDM(userId);
+                await dm.send({ embeds: [embed] });
+              }
             } catch (dmErr) {}
           }
         }
