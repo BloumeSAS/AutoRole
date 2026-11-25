@@ -65,11 +65,19 @@ client.on('guildMemberAdd', (member) => {
   }
 });
 
-client.on('messageReactionAdd', (data) => {
+client.on('messageReactionAdd', (reaction, user, messageId) => {
   try {
-    require('./events/messageReactionAdd')(client, data);
+    require('./events/messageReactionAdd')(client, reaction, user, messageId, 'add');
   } catch (error) {
     console.error("Erreur dans le gestionnaire d'événement 'messageReactionAdd' :", error);
+  }
+});
+
+client.on('messageReactionRemove', (reaction, user, messageId) => {
+  try {
+    require('./events/messageReactionAdd')(client, reaction, user, messageId, 'remove');
+  } catch (error) {
+    console.error("Erreur dans le gestionnaire d'événement 'messageReactionRemove' :", error);
   }
 });
 

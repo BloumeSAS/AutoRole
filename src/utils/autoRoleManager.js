@@ -45,6 +45,7 @@ async function safeAddRole(client, serverId, member, roleId) {
     body: JSON.stringify({ roles: newRoleIds })
   });
 
+  member.roles = newRoleIds;
   return true;
 }
 
@@ -71,18 +72,55 @@ async function safeRemoveRole(client, serverId, member, roleId) {
     body: JSON.stringify({ roles: newRoleIds })
   });
 
+  member.roles = newRoleIds;
   return true;
+}
+
+function emojiMatches(reactionEmoji, mappingEmoji) {
+  const e = String(reactionEmoji || '').trim();
+  const m = String(mappingEmoji || '').trim();
+  if (!e || !m) return false;
+  return e === m ||
+         encodeURIComponent(e) === encodeURIComponent(m) ||
+         e.includes(m) ||
+         m.includes(e);
+}
+
+function getMemberRoleIds(member) {
+  if (typeof member.roleIds === 'function') {
+    return member.roleIds();
+  }
+  if (Array.isArray(member.roles)) {
+    return member.roles.map(item => typeof item === 'string' ? item : (item.id || item.publicId)).filter(Boolean);
+  }
+  return [];
+}
+
+async function sendRoleDM(client, member, userId, title, description, serverId) {
+  try {
+    const embed = createEmbed(title, description, serverId);
+    if (member && typeof member.send === 'function') {
+      await member.send({ embeds: [embed] });
+    } else {
+      const dm = await client.createDM(userId);
+      await dm.send({ embeds: [embed] });
+    }
+  } catch (dmErr) {}
 }
 
 /**
  * Handles real-time reaction role synchronization when reaction update payload is received.
+ * Supports both bloumechat v4.2+ (reactionInfo, user, messageId, action) and raw socket payloads ({ messagePublicId, reactions }).
  * @param {import('bloumechat').BloumeChat} client 
- * @param {object} rawData - Payload from messageReactionAdd event
+ * @param {object} rawData - Payload from messageReactionAdd/Remove or raw 'message:reaction' socket event
+ * @param {import('bloumechat').User} [user] - User who reacted (bloumechat v4.2+)
+ * @param {string} [messageIdArg] - Message ID (bloumechat v4.2+)
+ * @param {'add'|'remove'} [action] - Action type when called from messageReactionAdd/Remove
  */
-async function handleReactionRole(client, rawData) {
+async function handleReactionRole(client, rawData, user = null, messageIdArg = null, action = 'add') {
   if (!rawData) return;
 
-  const messageId = String(rawData.messagePublicId || rawData.messageId || rawData.id || '');
+  const messageId = String(messageIdArg || rawData.messagePublicId || rawData.messageId || rawData.id || '');
   if (!messageId) return;
 
   const rrConfig = getReactionRoleByMessage(messageId);
@@ -91,7 +129,73 @@ async function handleReactionRole(client, rawData) {
   const targetServerId = rawData.serverId || rawData.serverPublicId || rrConfig.serverId;
   if (!targetServerId) return;
 
-  const rawReactions = Array.isArray(rawData.reactions) ? rawData.reactions : (rawData.emoji ? [rawData] : []);
+  // Mode 1: Single-user delta event from bloumechat v4.2+ (messageReactionAdd / messageReactionRemove)
+  if (!Array.isArray(rawData.reactions)) {
+    const userId = String(
+      (user && (user.id || user.publicId)) ||
+      rawData.userPublicId ||
+      rawData.userId ||
+      rawData.authorId ||
+      ''
+    ).trim();
+    const emoji = String(rawData.emoji || rawData.reaction || '').trim();
+
+    if (!userId || !emoji) return;
+    if (client.user && userId === client.user.id) return;
+
+    for (const mapping of rrConfig.mappings) {
+      if (!emojiMatches(emoji, mapping.emoji)) continue;
+
+      const roleId = mapping.roleId;
+      const lockKey = `${action === 'remove' ? 'remove' : 'add'}:${messageId}:${userId}:${roleId}`;
+      if (isLocked(lockKey)) continue;
+
+      try {
+        const member = await client.members.fetch(targetServerId, userId);
+        if (!member) continue;
+
+        const memberRoleIds = getMemberRoleIds(member);
+
+        if (action === 'remove') {
+          if (memberRoleIds.includes(roleId)) {
+            const removed = await safeRemoveRole(client, targetServerId, member, roleId);
+            if (removed) {
+              console.log(`[AutoRoleManager] ❌ Réaction retirée : Rôle ${mapping.roleName} (${roleId}) retiré à ${member.user ? member.user.tagString : userId}`);
+              await sendRoleDM(
+                client,
+                member,
+                userId,
+                "🎭 Rôle Retiré",
+                `Le rôle **${mapping.roleName}** vous a été retiré suite au retrait de votre réaction sur le serveur.`,
+                targetServerId
+              );
+            }
+          }
+        } else {
+          if (!memberRoleIds.includes(roleId)) {
+            const added = await safeAddRole(client, targetServerId, member, roleId);
+            if (added) {
+              console.log(`[AutoRoleManager] ✅ Réaction ajoutée : Rôle ${mapping.roleName} (${roleId}) attribué à ${member.user ? member.user.tagString : userId}`);
+              await sendRoleDM(
+                client,
+                member,
+                userId,
+                "🎭 Rôle Attribué",
+                `Le rôle **${mapping.roleName}** vous a été attribué suite à votre réaction sur le serveur !`,
+                targetServerId
+              );
+            }
+          }
+        }
+      } catch (err) {
+        console.error(`[AutoRoleManager] Erreur (${action}) rôle ${mapping.roleName} pour ${userId}:`, err.message);
+      }
+    }
+    return;
+  }
+
+  // Mode 2: Full reaction list payload from raw 'message:reaction' socket event
+  const rawReactions = rawData.reactions;
 
   // Synchronize each role mapping configured for this message
   for (const mapping of rrConfig.mappings) {
@@ -100,14 +204,7 @@ async function handleReactionRole(client, rawData) {
     // Active user IDs currently reacting with this mapping's emoji (excluding bot)
     const activeUserIds = new Set(
       rawReactions
-        .filter(r => {
-          const e = String(r.emoji || r.reaction || '').trim();
-          if (!e) return false;
-          return e === mapping.emoji || 
-                 encodeURIComponent(e) === encodeURIComponent(mapping.emoji) ||
-                 e.includes(mapping.emoji) || 
-                 mapping.emoji.includes(e);
-        })
+        .filter(r => emojiMatches(r.emoji || r.reaction, mapping.emoji))
         .map(r => String(r.userPublicId || r.userId || r.authorId || '').trim())
         .filter(uId => uId && (!client.user || uId !== client.user.id))
     );
@@ -121,26 +218,20 @@ async function handleReactionRole(client, rawData) {
         const member = await client.members.fetch(targetServerId, userId);
         if (!member) continue;
 
-        let memberRoleIds = [];
-        if (typeof member.roleIds === 'function') {
-          memberRoleIds = member.roleIds();
-        } else if (Array.isArray(member.roles)) {
-          memberRoleIds = member.roles.map(item => typeof item === 'string' ? item : (item.id || item.publicId)).filter(Boolean);
-        }
+        const memberRoleIds = getMemberRoleIds(member);
 
         if (!memberRoleIds.includes(roleId)) {
           const added = await safeAddRole(client, targetServerId, member, roleId);
           if (added) {
             console.log(`[AutoRoleManager] ✅ Réaction ajoutée : Rôle ${mapping.roleName} (${roleId}) attribué à ${member.user ? member.user.tagString : userId}`);
-            try {
-              const embed = createEmbed("🎭 Rôle Attribué", `Le rôle **${mapping.roleName}** vous a été attribué suite à votre réaction sur le serveur !`, targetServerId);
-              if (typeof member.send === 'function') {
-                await member.send({ embeds: [embed] });
-              } else {
-                const dm = await client.createDM(userId);
-                await dm.send({ embeds: [embed] });
-              }
-            } catch (dmErr) {}
+            await sendRoleDM(
+              client,
+              member,
+              userId,
+              "🎭 Rôle Attribué",
+              `Le rôle **${mapping.roleName}** vous a été attribué suite à votre réaction sur le serveur !`,
+              targetServerId
+            );
           }
         }
       } catch (err) {
@@ -163,12 +254,7 @@ async function handleReactionRole(client, rawData) {
         // Skip bot itself
         if (client.user && userId === client.user.id) continue;
 
-        let memberRoleIds = [];
-        if (typeof member.roleIds === 'function') {
-          memberRoleIds = member.roleIds();
-        } else if (Array.isArray(member.roles)) {
-          memberRoleIds = member.roles.map(item => typeof item === 'string' ? item : (item.id || item.publicId)).filter(Boolean);
-        }
+        const memberRoleIds = getMemberRoleIds(member);
 
         // If member has role BUT is no longer in activeUserIds -> Remove role!
         if (memberRoleIds.includes(roleId) && !activeUserIds.has(userId)) {
@@ -178,15 +264,14 @@ async function handleReactionRole(client, rawData) {
           const removed = await safeRemoveRole(client, targetServerId, member, roleId);
           if (removed) {
             console.log(`[AutoRoleManager] ❌ Réaction retirée : Rôle ${mapping.roleName} (${roleId}) retiré à ${member.user ? member.user.tagString : userId}`);
-            try {
-              const embed = createEmbed("🎭 Rôle Retiré", `Le rôle **${mapping.roleName}** vous a été retiré suite au retrait de votre réaction sur le serveur.`, targetServerId);
-              if (typeof member.send === 'function') {
-                await member.send({ embeds: [embed] });
-              } else {
-                const dm = await client.createDM(userId);
-                await dm.send({ embeds: [embed] });
-              }
-            } catch (dmErr) {}
+            await sendRoleDM(
+              client,
+              member,
+              userId,
+              "🎭 Rôle Retiré",
+              `Le rôle **${mapping.roleName}** vous a été retiré suite au retrait de votre réaction sur le serveur.`,
+              targetServerId
+            );
           }
         }
       }
