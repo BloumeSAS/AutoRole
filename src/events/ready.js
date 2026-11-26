@@ -3,7 +3,7 @@ const { getSettings } = require('../utils/settingsManager');
 const { bindSocketListeners } = require('../utils/socketListener');
 
 /**
- * @param {import('bloumechat').BloumeChat} client 
+ * @param {import('@bloume/chat').BloumeChat} client 
  */
 module.exports = (client) => {
   console.log(`========================================`);

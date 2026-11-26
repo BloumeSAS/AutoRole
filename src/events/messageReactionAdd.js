@@ -1,9 +1,9 @@
 const { handleReactionRole } = require('../utils/autoRoleManager');
 
 /**
- * @param {import('bloumechat').BloumeChat} client 
+ * @param {import('@bloume/chat').BloumeChat} client 
  * @param {object} data - Reaction event payload or reaction info
- * @param {import('bloumechat').User} [user] - User who reacted (bloumechat v4.2+)
+ * @param {import('@bloume/chat').User} [user] - User who reacted (bloumechat v4.2+)
  * @param {string} [messageId] - Message Public ID (bloumechat v4.2+)
  * @param {'add'|'remove'} [action] - Reaction action type
  */

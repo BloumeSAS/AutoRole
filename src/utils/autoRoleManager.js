@@ -111,9 +111,9 @@ async function sendRoleDM(client, member, userId, title, description, serverId) 
 /**
  * Handles real-time reaction role synchronization when reaction update payload is received.
  * Supports both bloumechat v4.2+ (reactionInfo, user, messageId, action) and raw socket payloads ({ messagePublicId, reactions }).
- * @param {import('bloumechat').BloumeChat} client 
+ * @param {import('@bloume/chat').BloumeChat} client 
  * @param {object} rawData - Payload from messageReactionAdd/Remove or raw 'message:reaction' socket event
- * @param {import('bloumechat').User} [user] - User who reacted (bloumechat v4.2+)
+ * @param {import('@bloume/chat').User} [user] - User who reacted (bloumechat v4.2+)
  * @param {string} [messageIdArg] - Message ID (bloumechat v4.2+)
  * @param {'add'|'remove'} [action] - Action type when called from messageReactionAdd/Remove
  */
@@ -283,8 +283,8 @@ async function handleReactionRole(client, rawData, user = null, messageIdArg = n
 
 /**
  * Handles automatic join role assignment when a new member joins a server.
- * @param {import('bloumechat').BloumeChat} client 
- * @param {import('bloumechat').Member} member 
+ * @param {import('@bloume/chat').BloumeChat} client 
+ * @param {import('@bloume/chat').Member} member 
  */
 async function handleJoinAutoRole(client, member) {
   if (!member || !member.serverId) return;

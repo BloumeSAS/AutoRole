@@ -1,6 +1,6 @@
 /**
  * Updates the bot's rich presence activity based on server count.
- * @param {import('bloumechat').BloumeChat} client 
+ * @param {import('@bloume/chat').BloumeChat} client 
  */
 async function updateActivity(client) {
   if (!client || !client.user) return;

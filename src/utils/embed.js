@@ -1,4 +1,4 @@
-const { EmbedBuilder } = require('bloumechat');
+const { EmbedBuilder } = require('@bloume/chat');
 const { getSettings } = require('./settingsManager');
 
 /**

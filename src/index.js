@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { BloumeChat } = require('bloumechat');
+const { BloumeChat } = require('@bloume/chat');
 const fs = require('fs');
 const path = require('path');
 

@@ -1,8 +1,8 @@
 const { updateActivity } = require('../utils/activityManager');
 
 /**
- * @param {import('bloumechat').BloumeChat} client 
- * @param {import('bloumechat').Guild} guild 
+ * @param {import('@bloume/chat').BloumeChat} client 
+ * @param {import('@bloume/chat').Guild} guild 
  */
 module.exports = (client, guild) => {
   if (!guild) return;

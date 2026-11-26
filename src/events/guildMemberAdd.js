@@ -1,8 +1,8 @@
 const { handleJoinAutoRole } = require('../utils/autoRoleManager');
 
 /**
- * @param {import('bloumechat').BloumeChat} client 
- * @param {import('bloumechat').Member} member 
+ * @param {import('@bloume/chat').BloumeChat} client 
+ * @param {import('@bloume/chat').Member} member 
  */
 module.exports = async (client, member) => {
   try {

@@ -3,8 +3,8 @@ const { hasAdminAccess } = require('../utils/permissionCheck');
 const { getSettings } = require('../utils/settingsManager');
 
 /**
- * @param {import('bloumechat').BloumeChat} client 
- * @param {import('bloumechat').Message} message 
+ * @param {import('@bloume/chat').BloumeChat} client 
+ * @param {import('@bloume/chat').Message} message 
  */
 module.exports = async (client, message) => {
   // Ignore messages from bots

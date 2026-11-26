@@ -1,4 +1,4 @@
-const { PermissionFlags } = require('bloumechat');
+const { PermissionFlags } = require('@bloume/chat');
 const { getSettings } = require('./settingsManager');
 
 const permissionMap = {
@@ -15,8 +15,8 @@ const permissionMap = {
 
 /**
  * Checks if the member who sent the message has permission to execute admin/configuration commands.
- * @param {import('bloumechat').BloumeChat} client 
- * @param {import('bloumechat').Message} message 
+ * @param {import('@bloume/chat').BloumeChat} client 
+ * @param {import('@bloume/chat').Message} message 
  * @returns {Promise<boolean>}
  */
 async function hasAdminAccess(client, message) {
